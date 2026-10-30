@@ -225,14 +225,23 @@ function ModelStudio({ onHide }) {
           setMessage({ kind: 'error', text: 'تم إيقاف الحفظ: فحص API key لم ينجح.' })
           return
         }
-        await host.request('model.save_key', { slug: provider, api_key: apiKey.trim() })
+        if (provider.startsWith('custom:')) {
+          if (!envVar) throw new Error('لا يوجد متغير أسرار معروف لهذا المزود.')
+          await desktopApi('/api/env', 'PUT', {
+            key: envVar,
+            value: apiKey.trim(),
+            provider_setup: true
+          })
+        } else {
+          await host.request('model.save_key', { slug: provider, api_key: apiKey.trim() })
+        }
       }
       const result = await desktopApi('/api/model/set', 'POST', {
         scope: 'main',
         provider,
         model,
         base_url: baseUrl.trim(),
-        api_key: provider === 'custom' ? apiKey.trim() : ''
+        api_key: provider.startsWith('custom:') || provider === 'custom' ? apiKey.trim() : ''
       })
       await host.request('config.set', { key: 'reasoning', value: reasoning, scope: 'global' }).catch(() => undefined)
       await host.request('config.set', { key: 'fast', value: fast ? 'fast' : 'normal', scope: 'global' }).catch(() => undefined)
