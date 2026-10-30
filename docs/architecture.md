@@ -15,6 +15,7 @@ The plugin is loaded by Hermes Desktop from its `desktop-plugins` directory. It 
 | Validate a provider key | `POST /api/providers/validate` |
 | Reveal the current key | `POST /api/env/reveal` |
 | Read redacted credential history | `GET /api/credentials/pool` |
+| Save masked rotation history | Plugin-scoped `ctx.storage` (previews only) |
 | Disconnect a provider | `host.request('model.disconnect', ...)` |
 | Save model behavior | `host.request('config.set', ...)` |
 
@@ -25,6 +26,10 @@ The active profile is read from `host.state.profile`. Configuration and credenti
 ## UI behavior
 
 The pane is registered under `model-key-switcher:pane`. The hide action removes the pane contribution but leaves the plugin loaded. A status-bar chip registers while the pane is hidden and restores it on click. The hidden state is stored in the plugin's namespaced `ctx.storage`.
+
+## Credential history
+
+Hermes' credential pool reports redacted pool entries, but a rotation of a custom `key_env` value is not necessarily represented as a historical pool row. The plugin therefore records only a masked preview of the value being replaced (for example `sk-a46…HkXU`) in its own profile/provider-scoped storage. Raw previous keys are never persisted by the plugin.
 
 ## Compatibility
 
