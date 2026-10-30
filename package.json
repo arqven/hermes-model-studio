@@ -1,0 +1,22 @@
+{
+  "name": "hermes-model-studio",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Hermes Agent desktop plugin for selecting models and managing provider credentials.",
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/plugin.js"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arqven/hermes-model-studio.git"
+  },
+  "keywords": [
+    "hermes-agent",
+    "hermes-plugin",
+    "desktop-plugin",
+    "model-provider",
+    "api-key"
+  ]
+}
