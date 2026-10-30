@@ -28,6 +28,13 @@ function errorText(error) {
   return error instanceof Error ? error.message : String(error || 'Unknown error')
 }
 
+function maskKey(value) {
+  const text = String(value || '')
+  if (!text) return ''
+  if (text.length <= 8) return '••••••••'
+  return `${text.slice(0, 4)}…${text.slice(-4)}`
+}
+
 function desktopApi(path, method = 'GET', body) {
   return window.hermesDesktop.api({ path, method, ...(body ? { body } : {}) })
 }
@@ -56,7 +63,7 @@ function Field({ label, children, hint }) {
   })
 }
 
-function ModelStudio({ onHide }) {
+function ModelStudio({ onHide, getKeyHistory, recordPreviousKey }) {
   const profile = useValue(host.state.profile) || 'default'
   const [data, setData] = useState(null)
   const [config, setConfig] = useState(null)
@@ -76,6 +83,7 @@ function ModelStudio({ onHide }) {
   const [poolEntries, setPoolEntries] = useState([])
   const [validation, setValidation] = useState(null)
   const [keyLoading, setKeyLoading] = useState(false)
+  const [keyHistory, setKeyHistory] = useState([])
 
   const providers = useMemo(() => (data?.providers || []).filter(row => row?.slug), [data])
   const selectedProvider = providers.find(row => row.slug === provider) || null
@@ -191,12 +199,17 @@ function ModelStudio({ onHide }) {
     setRevealedKey(null)
     setPoolEntries([])
     setValidation(null)
+    setKeyHistory(getKeyHistory(provider, profile))
     if (showKeys) {
       void loadCredentialHistory()
       void revealCurrentKey()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showKeys, provider])
+
+  useEffect(() => {
+    setKeyHistory(getKeyHistory(provider, profile))
+  }, [provider, profile, getKeyHistory])
 
   function chooseProvider(next) {
     setProvider(next)
@@ -227,12 +240,26 @@ function ModelStudio({ onHide }) {
         }
         if (provider.startsWith('custom:')) {
           if (!envVar) throw new Error('لا يوجد متغير أسرار معروف لهذا المزود.')
+          try {
+            const current = await desktopApi('/api/env/reveal', 'POST', { key: envVar })
+            if (current?.value && current.value !== apiKey.trim()) {
+              setKeyHistory(recordPreviousKey(provider, profile, current.value))
+            }
+          } catch { /* no current key to archive */ }
           await desktopApi('/api/env', 'PUT', {
             key: envVar,
             value: apiKey.trim(),
             provider_setup: true
           })
         } else {
+          if (envVar) {
+            try {
+              const current = await desktopApi('/api/env/reveal', 'POST', { key: envVar })
+              if (current?.value && current.value !== apiKey.trim()) {
+                setKeyHistory(recordPreviousKey(provider, profile, current.value))
+              }
+            } catch { /* no current key to archive */ }
+          }
           await host.request('model.save_key', { slug: provider, api_key: apiKey.trim() })
         }
       }
@@ -319,7 +346,12 @@ function ModelStudio({ onHide }) {
             poolEntries.length ? jsxs('div', { className: 'flex flex-col gap-1', children: [
               jsx('span', { className: 'text-[0.6875rem] text-(--ui-text-secondary)', children: 'السوابق:' }),
               ...poolEntries.map(entry => jsx('div', { className: 'rounded bg-(--ui-stroke-secondary)/20 px-2 py-0.5 text-[0.6875rem] text-(--ui-text-tertiary)', children: `${entry.label || entry.id} — ${entry.token_preview || '(بدون معاينة)'}${entry.last_status ? ` [${entry.last_status}]` : ''}` }, entry.index))
-            ] }) : jsx('span', { className: 'text-[0.6875rem] text-(--ui-text-tertiary)', children: 'لا توجد سوابق.' })
+            ] }) : null,
+            keyHistory.length ? jsxs('div', { className: 'flex flex-col gap-1', children: [
+              jsx('span', { className: 'text-[0.6875rem] text-(--ui-text-secondary)', children: 'سوابق تغيير المفتاح:' }),
+              ...keyHistory.map((entry, index) => jsx('div', { className: 'rounded bg-(--ui-stroke-secondary)/20 px-2 py-0.5 text-[0.6875rem] text-(--ui-text-tertiary)', children: `${entry.preview}${entry.savedAt ? ` — ${new Date(entry.savedAt).toLocaleString()}` : ''}` }, `${entry.preview}-${index}`))
+            ] }) : null,
+            !poolEntries.length && !keyHistory.length ? jsx('span', { className: 'text-[0.6875rem] text-(--ui-text-tertiary)', children: 'لا توجد سوابق.' }) : null
           ] }) : null
         ]
       }),
@@ -348,6 +380,19 @@ export default {
   description: 'اختيار المزود والموديل وإدارة مفاتيح API وإعدادات النموذج.',
   register(ctx) {
     const PANE_ID = `${ID}:pane`
+    const historyKey = (provider, profile) => `keyHistory:${profile || 'default'}:${provider || 'unknown'}`
+    const getKeyHistory = (provider, profile) => ctx.storage.get(historyKey(provider, profile), [])
+    const recordPreviousKey = (provider, profile, value) => {
+      const preview = maskKey(value)
+      if (!preview) return getKeyHistory(provider, profile)
+      const current = getKeyHistory(provider, profile)
+      const next = [
+        { preview, savedAt: new Date().toISOString() },
+        ...current.filter(entry => entry?.preview !== preview)
+      ].slice(0, 10)
+      ctx.storage.set(historyKey(provider, profile), next)
+      return next
+    }
     let paneDispose = null
     let chipDispose = null
 
@@ -359,7 +404,7 @@ export default {
           area: 'panes',
           title: 'Model Studio',
           data: { placement: 'right', width: '340px' },
-          render: () => jsx(ModelStudio, { onHide: hidePane })
+          render: () => jsx(ModelStudio, { onHide: hidePane, getKeyHistory, recordPreviousKey })
         })
       }
       if (typeof host.revealPane === 'function') host.revealPane(PANE_ID)
