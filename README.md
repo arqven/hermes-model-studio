@@ -18,27 +18,78 @@ The plugin does not contain provider keys, does not write `.env` files directly,
 
 ## Requirements
 
-- Hermes Agent Desktop with the desktop plugin loader.
-- A Hermes version exposing the model RPCs and provider endpoints used by this plugin.
-- A configured Hermes profile.
+- Hermes Agent Desktop (the CLI alone does not load desktop UI plugins).
+- A configured Hermes profile and at least one provider/model if you want to use the connection controls.
+- No Node.js installation, package install, build step, or extra dependency is required to install the plugin.
 
 ## Install
 
-1. Copy `src/plugin.js` to the Hermes desktop plugin directory:
+The plugin is a single JavaScript file. Hermes Desktop loads it from its
+`desktop-plugins` directory; the folder name must match the plugin id
+(`model-key-switcher`).
 
-   ```text
-   %LOCALAPPDATA%\hermes\desktop-plugins\model-key-switcher\plugin.js
-   ```
+### 1. Get the file
 
-   On macOS/Linux, use:
+Download `src/plugin.js` from this repository, or clone it:
 
-   ```text
-   ~/.hermes/desktop-plugins/model-key-switcher/plugin.js
-   ```
+```bash
+git clone https://github.com/arqven/hermes-model-studio.git
+cd hermes-model-studio
+```
 
-2. Open Hermes Desktop.
-3. Run `Reload desktop plugins` from the command palette if the plugin is not loaded automatically.
-4. Open the Model Studio pane.
+You can also use **Code > Download ZIP** on GitHub and extract the archive.
+
+### 2. Create the plugin folder
+
+The destination depends on your operating system. `%LOCALAPPDATA%` is usually
+`C:\Users\<you>\AppData\Local`.
+
+**Windows (PowerShell):**
+
+```powershell
+New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\hermes\desktop-plugins\model-key-switcher" | Out-Null
+Copy-Item src\plugin.js "$env:LOCALAPPDATA\hermes\desktop-plugins\model-key-switcher\plugin.js"
+```
+
+**macOS / Linux:**
+
+```bash
+mkdir -p ~/.hermes/desktop-plugins/model-key-switcher
+cp src/plugin.js ~/.hermes/desktop-plugins/model-key-switcher/plugin.js
+```
+
+If you use a named Hermes profile, replace the base directory with the
+profile directory:
+
+- Windows: `%LOCALAPPDATA%\hermes\profiles\<profile>\desktop-plugins\model-key-switcher\plugin.js`
+- macOS / Linux: `~/.hermes/profiles/<profile>/desktop-plugins/model-key-switcher/plugin.js`
+
+### 3. Load it
+
+1. Open Hermes Desktop.
+2. The app watches the plugins directory and loads the file within a few
+   seconds. If the pane does not appear, run `Reload desktop plugins` from the
+   command palette (`Cmd+K / Ctrl+K`).
+3. Open the **Model Studio** pane.
+
+### Verify
+
+- The Model Studio pane appears on the right side of the workspace.
+- No error toast such as `Plugin model-key-switcher failed to load` appears.
+- Closing the pane hides it; a small `model studio` chip in the status bar
+  restores it.
+
+### Uninstall
+
+Delete the plugin folder:
+
+```powershell
+Remove-Item -Recurse "$env:LOCALAPPDATA\hermes\desktop-plugins\model-key-switcher"
+```
+
+```bash
+rm -rf ~/.hermes/desktop-plugins/model-key-switcher
+```
 
 ## Usage
 
